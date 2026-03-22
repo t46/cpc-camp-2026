@@ -96,6 +96,125 @@ header h1 {
   font-weight: 500;
 }
 
+/* ===== Landing ===== */
+#landing {
+  max-width: 1600px;
+  margin: 1.5rem auto;
+  padding: 0 2rem;
+}
+
+.landing-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.landing-text h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+}
+
+.landing-text p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.join-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.join-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.join-instruction {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  word-break: break-all;
+}
+
+.join-instruction a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.join-instruction a:hover {
+  text-decoration: underline;
+}
+
+.join-copy-btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.join-copy-btn:hover {
+  opacity: 0.85;
+}
+
+.join-steps {
+  display: flex;
+  gap: 1rem;
+}
+
+.join-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.join-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .landing-inner {
+    grid-template-columns: 1fr;
+  }
+  .join-steps {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
 /* ===== Dashboard Grid ===== */
 #dashboard {
   max-width: 1600px;

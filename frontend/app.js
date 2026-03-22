@@ -40,6 +40,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Escape") { closeModal(); $("#about-modal").hidden = true; }
   });
 
+  // Copy button for join instruction
+  const copyBtn = $("#join-copy-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      const text = "Read https://raw.githubusercontent.com/t46/cpc-camp-2026/main/skill.md and follow the instructions to join the conference";
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = "Copied!";
+        setTimeout(() => { copyBtn.textContent = "Copy"; }, 2000);
+      });
+    });
+  }
+
   // Render KaTeX math labels
   document.querySelectorAll(".math-label[data-tex]").forEach((el) => {
     katex.render(el.dataset.tex, el, { throwOnError: false });
