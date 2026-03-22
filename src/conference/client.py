@@ -53,42 +53,6 @@ def list_topics(client: Client) -> list[dict]:
     return client.table("topics").select("*").execute().data
 
 
-# --- Round operations ---
-
-
-def start_round(client: Client, topic_id: str) -> dict:
-    return (
-        client.table("rounds")
-        .insert({"topic_id": topic_id, "phase": "submission"})
-        .execute()
-    ).data[0]
-
-
-def get_round(client: Client, round_id: int) -> dict:
-    return (
-        client.table("rounds").select("*").eq("id", round_id).single().execute()
-    ).data
-
-
-def get_latest_round(client: Client, topic_id: str | None = None) -> dict | None:
-    q = client.table("rounds").select("*").order("id", desc=True).limit(1)
-    if topic_id:
-        q = q.eq("topic_id", topic_id)
-    result = q.execute()
-    return result.data[0] if result.data else None
-
-
-def advance_round_phase(client: Client, round_id: int, new_phase: str) -> dict:
-    update = {"phase": new_phase}
-    if new_phase == "completed":
-        from datetime import datetime, timezone
-
-        update["completed_at"] = datetime.now(timezone.utc).isoformat()
-    return (
-        client.table("rounds").update(update).eq("id", round_id).execute()
-    ).data[0]
-
-
 # --- Paper operations ---
 
 
@@ -96,7 +60,6 @@ def submit_paper(
     client: Client,
     agent_id: str,
     topic_id: str,
-    round_id: int,
     title: str,
     content: str,
     abstract: str = "",
@@ -107,7 +70,6 @@ def submit_paper(
             {
                 "agent_id": agent_id,
                 "topic_id": topic_id,
-                "round_id": round_id,
                 "title": title,
                 "abstract": abstract,
                 "content": content,
@@ -124,14 +86,20 @@ def get_paper(client: Client, paper_id: str) -> dict:
 
 
 def list_papers(
-    client: Client, round_id: int | None = None, topic_id: str | None = None
+    client: Client, topic_id: str | None = None, status: str | None = None
 ) -> list[dict]:
     q = client.table("papers").select("*")
-    if round_id is not None:
-        q = q.eq("round_id", round_id)
     if topic_id is not None:
         q = q.eq("topic_id", topic_id)
-    return q.execute().data
+    if status is not None:
+        q = q.eq("status", status)
+    return q.order("submitted_at").execute().data
+
+
+def update_paper_status(client: Client, paper_id: str, status: str) -> dict:
+    return (
+        client.table("papers").update({"status": status}).eq("id", paper_id).execute()
+    ).data[0]
 
 
 # --- Review operations ---
@@ -141,7 +109,6 @@ def submit_review(
     client: Client,
     reviewer_id: str,
     paper_id: str,
-    round_id: int,
     score: float,
     feedback: str = "",
 ) -> dict:
@@ -151,7 +118,6 @@ def submit_review(
             {
                 "reviewer_id": reviewer_id,
                 "paper_id": paper_id,
-                "round_id": round_id,
                 "score": score,
                 "feedback": feedback,
             }
@@ -164,67 +130,56 @@ def get_reviews_for_paper(client: Client, paper_id: str) -> list[dict]:
     return client.table("reviews").select("*").eq("paper_id", paper_id).execute().data
 
 
-def get_reviews_for_round(client: Client, round_id: int) -> list[dict]:
-    return client.table("reviews").select("*").eq("round_id", round_id).execute().data
-
-
 # --- Review assignment operations ---
 
 
 def create_review_assignments(
     client: Client,
-    round_id: int,
+    paper_id: str,
     topic_id: str,
     min_reviewers: int = 2,
 ) -> list[dict]:
     """
-    Generate review assignments for a round.
+    Generate review assignments for a single paper.
 
-    Each paper gets at least min_reviewers reviewers (who are not the author).
+    The paper gets at least min_reviewers reviewers (who are not the author).
     Each reviewer must also review w_current (if it exists).
     """
-    papers = list_papers(client, round_id=round_id)
+    paper = get_paper(client, paper_id)
     agents = list_agents(client)
     current = get_accepted_paper(client, topic_id)
     current_paper_id = current["paper_id"] if current else None
 
-    if not papers or len(agents) < 2:
+    if len(agents) < 2:
         return []
 
-    agent_ids = [a["id"] for a in agents]
+    author_id = paper["agent_id"]
+    eligible = [a["id"] for a in agents if a["id"] != author_id]
+
+    import random
+
+    reviewers = random.sample(eligible, min(min_reviewers, len(eligible)))
+
     assignments = []
-
-    for paper in papers:
-        author_id = paper["agent_id"]
-        # Eligible reviewers: everyone except the author
-        eligible = [a for a in agent_ids if a != author_id]
-
-        # Assign min_reviewers (or all eligible if fewer)
-        import random
-
-        reviewers = random.sample(eligible, min(min_reviewers, len(eligible)))
-
-        for reviewer_id in reviewers:
-            assignments.append(
-                {
-                    "reviewer_id": reviewer_id,
-                    "paper_id": paper["id"],
-                    "round_id": round_id,
-                    "current_paper_id": current_paper_id,
-                }
-            )
+    for reviewer_id in reviewers:
+        assignments.append(
+            {
+                "reviewer_id": reviewer_id,
+                "paper_id": paper_id,
+                "current_paper_id": current_paper_id,
+            }
+        )
 
     if assignments:
         return client.table("review_assignments").insert(assignments).execute().data
     return []
 
 
-def get_review_assignments(client: Client, reviewer_id: str, round_id: int) -> list[dict]:
+def get_review_assignments(client: Client, reviewer_id: str) -> list[dict]:
     return (
         client.table("review_assignments")
         .select("*,papers(*)")
         .eq("reviewer_id", reviewer_id)
-        .eq("round_id", round_id)
         .execute()
         .data
     )
@@ -247,11 +202,11 @@ def get_accepted_paper(client: Client, topic_id: str) -> dict | None:
 
 
 def set_accepted_paper(
-    client: Client, topic_id: str, paper_id: str, round_id: int
+    client: Client, topic_id: str, paper_id: str
 ) -> dict:
     return (
         client.table("accepted_papers")
-        .insert({"topic_id": topic_id, "paper_id": paper_id, "round_id": round_id})
+        .insert({"topic_id": topic_id, "paper_id": paper_id})
         .execute()
     ).data[0]
 
@@ -262,7 +217,6 @@ def set_accepted_paper(
 def record_mh_event(
     client: Client,
     topic_id: str,
-    round_id: int,
     paper_new_id: str,
     paper_current_id: str | None,
     score_new_agg: float,
@@ -277,7 +231,6 @@ def record_mh_event(
         .insert(
             {
                 "topic_id": topic_id,
-                "round_id": round_id,
                 "paper_new_id": paper_new_id,
                 "paper_current_id": paper_current_id,
                 "score_new_agg": score_new_agg,
@@ -293,18 +246,24 @@ def record_mh_event(
 
 
 def get_mh_events(
-    client: Client, round_id: int | None = None, topic_id: str | None = None
+    client: Client, topic_id: str | None = None
 ) -> list[dict]:
     q = client.table("mh_events").select("*").order("chain_order")
-    if round_id is not None:
-        q = q.eq("round_id", round_id)
     if topic_id is not None:
         q = q.eq("topic_id", topic_id)
     return q.execute().data
 
 
-# --- Conference state ---
-
-
-def get_conference_state(client: Client) -> list[dict]:
-    return client.table("conference_state").select("*").execute().data
+def get_next_chain_order(client: Client, topic_id: str) -> int:
+    """Get the next chain_order for a topic."""
+    events = (
+        client.table("mh_events")
+        .select("chain_order")
+        .eq("topic_id", topic_id)
+        .order("chain_order", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if events.data:
+        return events.data[0]["chain_order"] + 1
+    return 0

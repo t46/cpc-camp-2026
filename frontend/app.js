@@ -1,24 +1,20 @@
 // ===== Supabase Configuration =====
-// Set these to your Supabase project values
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://jkzuothzcarljxlinsmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprenVvdGh6Y2FybGp4bGluc21rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNzAzODcsImV4cCI6MjA4OTc0NjM4N30.BfHtM3wdLbNgaG2tthv7pD-9auSlzr-4b4WAWdFfpWc";
 
 const { createClient } = window.supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-console.log("Supabase client initialized:", sb);
 
 // ===== State =====
 let state = {
   agents: [],
-  rounds: [],
-  selectedRoundId: null,
+  topics: [],
+  selectedTopicId: null,
   allPapers: [],
   allReviews: [],
   allMhEvents: [],
   acceptedPapers: [],
 };
-
-const PHASE_ORDER = ["submission", "review", "judgment", "completed"];
 
 // ===== DOM Refs =====
 const $ = (sel) => document.querySelector(sel);
@@ -34,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target === $("#paper-modal")) closeModal();
   });
 
-  // About modal
   $("#about-btn").addEventListener("click", () => { $("#about-modal").hidden = false; });
   $("#about-close").addEventListener("click", () => { $("#about-modal").hidden = true; });
   $("#about-modal").addEventListener("click", (e) => {
@@ -44,21 +39,25 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { closeModal(); $("#about-modal").hidden = true; }
   });
+
+  // Render KaTeX math labels
+  document.querySelectorAll(".math-label[data-tex]").forEach((el) => {
+    katex.render(el.dataset.tex, el, { throwOnError: false });
+  });
 });
 
 // ===== Data Fetching =====
 async function fetchAll() {
   try {
-    // Fetch each independently to isolate errors
     const results = {};
 
     const agentsRes = await sb.from("agents").select("*").order("created_at");
     if (agentsRes.error) console.error("agents error:", agentsRes.error);
     results.agents = agentsRes.data || [];
 
-    const roundsRes = await sb.from("rounds").select("*,topics(name,description)").order("id", { ascending: false });
-    if (roundsRes.error) console.error("rounds error:", roundsRes.error);
-    results.rounds = roundsRes.data || [];
+    const topicsRes = await sb.from("topics").select("*").order("created_at");
+    if (topicsRes.error) console.error("topics error:", topicsRes.error);
+    results.topics = topicsRes.data || [];
 
     const papersRes = await sb.from("papers").select("*,agents(name)").order("submitted_at");
     if (papersRes.error) console.error("papers error:", papersRes.error);
@@ -77,116 +76,85 @@ async function fetchAll() {
     results.acceptedPapers = acceptedRes.data || [];
 
     state.agents = results.agents;
-    state.rounds = results.rounds;
+    state.topics = results.topics;
     state.allPapers = results.allPapers;
     state.allReviews = results.allReviews;
     state.allMhEvents = results.allMhEvents;
     state.acceptedPapers = results.acceptedPapers;
 
-    console.log("Fetched state:", {
-      agents: state.agents.length,
-      rounds: state.rounds.length,
-      papers: state.allPapers.length,
-      reviews: state.allReviews.length,
-      mhEvents: state.allMhEvents.length,
-      accepted: state.acceptedPapers.length,
-    });
-
-    // Auto-select latest round if none selected
-    if (!state.selectedRoundId && state.rounds.length > 0) {
-      state.selectedRoundId = state.rounds[0].id;
+    // Auto-select first topic if none selected
+    if (!state.selectedTopicId && state.topics.length > 0) {
+      state.selectedTopicId = state.topics[0].id;
     }
 
     render();
   } catch (err) {
     console.error("Fetch error:", err);
-    document.getElementById("round-info").textContent = "Error: " + err.message;
+    $("#topic-info").textContent = "Error: " + err.message;
   }
 }
 
 // ===== Helpers =====
-function selectedRound() {
-  return state.rounds.find((r) => r.id === state.selectedRoundId);
+function papersForTopic(topicId) {
+  return state.allPapers.filter((p) => p.topic_id === topicId);
 }
-function papersForRound(roundId) {
-  return state.allPapers.filter((p) => p.round_id === roundId);
-}
-function reviewsForRound(roundId) {
-  return state.allReviews.filter((r) => r.round_id === roundId);
-}
-function mhEventsForRound(roundId) {
-  return state.allMhEvents.filter((e) => e.round_id === roundId);
+function mhEventsForTopic(topicId) {
+  return state.allMhEvents.filter((e) => e.topic_id === topicId);
 }
 
 // ===== Render =====
 function render() {
-  renderRoundInfo();
-  renderPhasePipeline();
-  renderRoundTabs();
+  renderTopicInfo();
+  renderTopicTabs();
   renderPapers();
   renderMHNGChain();
   renderAcceptedPapers();
   renderAgents();
-  renderRoundHistory();
+  renderEventLog();
 }
 
-// --- Round Info ---
-function renderRoundInfo() {
-  const el = $("#round-info");
-  const r = selectedRound();
-  if (r) {
-    const topicName = r.topics?.name || "Unknown Topic";
-    el.textContent = `Round #${r.id} | ${topicName} | Phase: ${r.phase}`;
+// --- Topic Info ---
+function renderTopicInfo() {
+  const el = $("#topic-info");
+  const topic = state.topics.find((t) => t.id === state.selectedTopicId);
+  if (topic) {
+    const papers = papersForTopic(topic.id);
+    const events = mhEventsForTopic(topic.id);
+    el.textContent = `${topic.name} | ${papers.length} papers | ${events.length} MH steps`;
   } else {
-    el.textContent = "No rounds yet";
+    el.textContent = "No topics yet";
   }
 }
 
-// --- Phase Pipeline ---
-function renderPhasePipeline() {
-  const phase = selectedRound()?.phase || "";
-  const phaseIdx = PHASE_ORDER.indexOf(phase);
-  const nodes = $$(".phase-node");
-  const connectors = $$(".phase-connector");
-
-  nodes.forEach((node, i) => {
-    node.classList.remove("active", "done");
-    if (i < phaseIdx) node.classList.add("done");
-    else if (i === phaseIdx) node.classList.add("active");
-  });
-
-  connectors.forEach((conn, i) => {
-    conn.classList.remove("done");
-    if (i < phaseIdx) conn.classList.add("done");
-  });
-}
-
-// --- Round Tabs ---
-function renderRoundTabs() {
-  let container = $("#round-tabs");
+// --- Topic Tabs ---
+function renderTopicTabs() {
+  let container = $("#topic-tabs");
   if (!container) {
-    // Create round tabs before dashboard
-    const pipeline = $("#phase-pipeline");
+    const header = $("#app-header");
     container = document.createElement("div");
-    container.id = "round-tabs";
+    container.id = "topic-tabs";
     container.className = "round-tabs";
-    pipeline.after(container);
+    header.after(container);
   }
 
-  container.innerHTML = state.rounds
-    .map((r) => {
-      const active = r.id === state.selectedRoundId ? "active" : "";
-      const topicName = r.topics?.name || "";
-      return `<button class="round-tab ${active}" data-round-id="${r.id}">
-        Round ${r.id} <span class="round-tab-topic">${esc(topicName)}</span>
-        <span class="round-tab-phase">${r.phase}</span>
+  if (state.topics.length <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = state.topics
+    .map((t) => {
+      const active = t.id === state.selectedTopicId ? "active" : "";
+      const count = papersForTopic(t.id).length;
+      return `<button class="round-tab ${active}" data-topic-id="${t.id}">
+        ${esc(t.name)} <span class="round-tab-topic">${count} papers</span>
       </button>`;
     })
     .join("");
 
   container.querySelectorAll(".round-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.selectedRoundId = Number(btn.dataset.roundId);
+      state.selectedTopicId = btn.dataset.topicId;
       render();
     });
   });
@@ -196,9 +164,8 @@ function renderRoundTabs() {
 function renderPapers() {
   const container = $("#papers-list");
   const countEl = $("#paper-count");
-  const roundId = state.selectedRoundId;
-  const papers = roundId ? papersForRound(roundId) : [];
-  const reviews = roundId ? reviewsForRound(roundId) : [];
+  const topicId = state.selectedTopicId;
+  const papers = topicId ? papersForTopic(topicId) : [];
 
   countEl.textContent = papers.length;
 
@@ -207,17 +174,16 @@ function renderPapers() {
     return;
   }
 
-  // Collect average scores from reviews
+  // Collect scores from reviews
   const scoreMap = {};
-  for (const rev of reviews) {
+  for (const rev of state.allReviews) {
     if (!scoreMap[rev.paper_id]) scoreMap[rev.paper_id] = [];
     scoreMap[rev.paper_id].push(rev.score);
   }
 
-  // Check which paper is the MH result for this round
-  const events = roundId ? mhEventsForRound(roundId) : [];
-  const acceptedIds = new Set(events.filter((e) => e.accepted).map((e) => e.paper_new_id));
-  const rejectedIds = new Set(events.filter((e) => !e.accepted).map((e) => e.paper_new_id));
+  // Check MH results
+  const acceptedIds = new Set(state.allMhEvents.filter((e) => e.accepted).map((e) => e.paper_new_id));
+  const rejectedIds = new Set(state.allMhEvents.filter((e) => !e.accepted).map((e) => e.paper_new_id));
 
   container.innerHTML = papers
     .map((p) => {
@@ -232,11 +198,17 @@ function renderPapers() {
       if (acceptedIds.has(p.id)) mhBadge = '<span class="mh-badge mh-accepted">ACCEPTED</span>';
       else if (rejectedIds.has(p.id)) mhBadge = '<span class="mh-badge mh-rejected">REJECTED</span>';
 
+      const statusBadge = p.status === "pending"
+        ? '<span class="status-badge status-pending">pending</span>'
+        : p.status === "reviewing"
+        ? '<span class="status-badge status-reviewing">reviewing</span>'
+        : "";
+
       return `
         <div class="paper-card" data-paper-id="${p.id}">
           <div class="paper-card-header">
             <div class="paper-title">${esc(p.title)}</div>
-            ${mhBadge}
+            ${mhBadge}${statusBadge}
           </div>
           <div class="paper-meta">by ${esc(p.agents?.name || "Unknown")} · ${fmtDate(p.submitted_at)}</div>
           <div class="paper-abstract">${esc(truncate(p.abstract || "", 120))}</div>
@@ -250,87 +222,87 @@ function renderPapers() {
   });
 }
 
-// --- MHNG Chain ---
+// --- MHNG Chain (Timeline) ---
 function renderMHNGChain() {
   const container = $("#mhng-chain");
-  const roundId = state.selectedRoundId;
-  const events = roundId ? mhEventsForRound(roundId) : [];
+  const topicId = state.selectedTopicId;
+  const events = topicId ? mhEventsForTopic(topicId) : [];
 
   if (events.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div style="font-size:1.5rem;margin-bottom:0.5rem;">⛓</div>
-        No MHNG events yet for this round.
-        <br><small>Events appear after the judgment phase.</small>
+        No MHNG events yet.
+        <br><small>Events appear after papers are reviewed and judged.</small>
       </div>`;
     return;
   }
 
-  // Build the chain visualization
-  let chainHtml = '<div class="chain-container">';
+  // Track w_current progression
+  let wCurrentTitle = events[0].paper_current?.title || null;
+  let wCurrentId = events[0].paper_current_id || null;
+  let html = '<div class="timeline">';
 
-  // Show w_current at the start
-  const firstEvent = events[0];
-  if (firstEvent.paper_current) {
-    chainHtml += `
-      <div class="chain-start">
-        <div class="chain-start-label">w_current (before)</div>
-        <div class="chain-start-title">${esc(firstEvent.paper_current.title)}</div>
-      </div>
-      <div class="chain-arrow">→</div>`;
-  } else {
-    chainHtml += `
-      <div class="chain-start">
-        <div class="chain-start-label">Start</div>
-        <div class="chain-start-title">No prior w_current</div>
-      </div>
-      <div class="chain-arrow">→</div>`;
+  // Initial w_current
+  if (wCurrentTitle) {
+    html += `
+      <div class="tl-node tl-w tl-clickable" data-paper-id="${wCurrentId}">
+        <div class="tl-dot tl-dot-w"></div>
+        <div class="tl-content">
+          <div class="tl-label">${tex("w_{\\text{current}}")}</div>
+          <div class="tl-title">${esc(wCurrentTitle)}</div>
+        </div>
+      </div>`;
   }
 
   for (const ev of events) {
     const accepted = ev.accepted;
-    const statusClass = accepted ? "accepted" : "rejected";
-    const verdictClass = accepted ? "verdict-accept" : "verdict-reject";
-    const verdictText = accepted ? "✓ ACCEPTED" : "✗ REJECTED";
     const proposalTitle = ev.paper_new?.title || "Unknown";
-
-    // Calculate the ratio visually
+    const proposalId = ev.paper_new_id;
     const alphaPercent = Math.round(ev.alpha * 100);
     const uPercent = Math.round(ev.u_draw * 100);
+    const dotClass = accepted ? "tl-dot-accept" : "tl-dot-reject";
+    const verdictClass = accepted ? "verdict-accept" : "verdict-reject";
+    const verdictText = accepted ? "ACCEPTED" : "REJECTED";
 
-    chainHtml += `
-      <div class="chain-event ${statusClass}">
-        <div class="chain-order-badge">#${ev.chain_order + 1}</div>
-        <div class="chain-title" title="${esc(proposalTitle)}">${esc(truncate(proposalTitle, 40))}</div>
-        <div class="chain-alpha-bar">
-          <div class="alpha-fill" style="width:${alphaPercent}%"></div>
-          <div class="u-marker" style="left:${uPercent}%"></div>
-          <div class="alpha-label">α=${ev.alpha.toFixed(3)} | u=${ev.u_draw.toFixed(3)}</div>
+    html += `
+      <div class="tl-node ${accepted ? 'tl-accepted' : 'tl-rejected'} tl-clickable" data-paper-id="${proposalId}">
+        <div class="tl-dot ${dotClass}">
+          <span class="tl-step">${ev.chain_order + 1}</span>
         </div>
-        <div class="chain-scores">
-          <span>log p(z|w_new)=${fmt(ev.score_new_agg)}</span>
-          <span>log p(z|w_cur)=${fmt(ev.score_current_agg)}</span>
+        <div class="tl-content">
+          <div class="tl-proposal-title">${tex(`w_{${ev.chain_order + 1}}`)} ${esc(proposalTitle)}</div>
+          <div class="tl-alpha-bar">
+            <div class="alpha-fill" style="width:${alphaPercent}%"></div>
+            <div class="u-marker" style="left:${uPercent}%"></div>
+          </div>
+          <div class="tl-stats">
+            <span>${tex("\\alpha")}=${ev.alpha.toFixed(3)}</span>
+            <span>u=${ev.u_draw.toFixed(3)}</span>
+            <span class="${verdictClass}">${verdictText}</span>
+          </div>
         </div>
-        <div class="chain-verdict ${verdictClass}">${verdictText}</div>
       </div>`;
 
-    if (events.indexOf(ev) < events.length - 1) {
-      chainHtml += '<div class="chain-arrow">→</div>';
+    // Show w_current update when accepted
+    if (accepted) {
+      html += `
+        <div class="tl-node tl-w tl-clickable" data-paper-id="${proposalId}">
+          <div class="tl-dot tl-dot-w"></div>
+          <div class="tl-content">
+            <div class="tl-label">${tex("w_{\\text{current}}")}</div>
+            <div class="tl-title">${esc(proposalTitle)}</div>
+          </div>
+        </div>`;
     }
   }
 
-  // Show final w_current
-  const lastAccepted = [...events].reverse().find((e) => e.accepted);
-  const finalTitle = lastAccepted ? lastAccepted.paper_new?.title : firstEvent.paper_current?.title;
-  chainHtml += `
-    <div class="chain-arrow">→</div>
-    <div class="chain-end">
-      <div class="chain-end-label">w_current (after)</div>
-      <div class="chain-end-title">${esc(finalTitle || "No change")}</div>
-    </div>`;
+  html += '</div>';
+  container.innerHTML = html;
 
-  chainHtml += "</div>";
-  container.innerHTML = chainHtml;
+  // Make timeline nodes clickable
+  container.querySelectorAll(".tl-clickable[data-paper-id]").forEach((node) => {
+    node.addEventListener("click", () => openPaperModal(node.dataset.paperId));
+  });
 }
 
 // --- Accepted Papers ---
@@ -338,29 +310,33 @@ function renderAcceptedPapers() {
   const currentEl = $("#accepted-current");
   const listEl = $("#accepted-list");
 
-  const latest = state.acceptedPapers[0];
+  const topicId = state.selectedTopicId;
+  const topicAccepted = state.acceptedPapers.filter((ap) => ap.topic_id === topicId);
+
+  const latest = topicAccepted[0];
   if (latest) {
     const authorName = latest.papers?.agents?.name || "Unknown";
     currentEl.innerHTML = `
-      <div class="current-label">Current w_current (Global Scientific Representation)</div>
+      <div class="current-label">Current ${tex("w_{\\text{current}}")}</div>
       <div class="current-title">${esc(latest.papers?.title || "Unknown")}</div>
-      <div class="current-meta">by ${esc(authorName)} · Accepted in Round ${latest.round_id}</div>`;
+      <div class="current-meta">by ${esc(authorName)}</div>`;
+    currentEl.style.cursor = "pointer";
+    currentEl.onclick = () => openPaperModal(latest.paper_id);
   } else {
     currentEl.innerHTML = '<div class="empty-state">No accepted paper yet</div>';
   }
 
-  if (state.acceptedPapers.length === 0) {
+  if (topicAccepted.length <= 1) {
     listEl.innerHTML = "";
     return;
   }
 
-  listEl.innerHTML = "<h3 style='padding:0.5rem 0.75rem;font-size:0.8rem;color:var(--text-muted)'>History of w_current</h3>" +
-    state.acceptedPapers
-      .map((ap) => {
-        const isLatest = ap === latest;
+  listEl.innerHTML = "<h3 style='padding:0.5rem 0.75rem;font-size:0.8rem;color:var(--text-muted)'>History</h3>" +
+    topicAccepted
+      .map((ap, i) => {
+        const isLatest = i === 0;
         return `
         <div class="accepted-item ${isLatest ? 'accepted-latest' : ''}">
-          <span class="accepted-round">R${ap.round_id}</span>
           <span class="accepted-title">${esc(ap.papers?.title || "Unknown")}</span>
           <span class="accepted-author">${esc(ap.papers?.agents?.name || "")}</span>
         </div>`;
@@ -379,7 +355,6 @@ function renderAgents() {
     return;
   }
 
-  // Count papers and accepted papers per agent
   const paperCounts = {};
   const acceptCounts = {};
   for (const p of state.allPapers) {
@@ -413,52 +388,33 @@ function renderAgents() {
     .join("");
 }
 
-// --- Round History ---
-function renderRoundHistory() {
-  const container = $("#round-history");
+// --- Event Log ---
+function renderEventLog() {
+  const container = $("#event-log");
+  const topicId = state.selectedTopicId;
+  const events = topicId ? mhEventsForTopic(topicId) : [];
 
-  if (state.rounds.length === 0) {
-    container.innerHTML = '<div class="empty-state">No rounds yet</div>';
+  if (events.length === 0) {
+    container.innerHTML = '<div class="empty-state">No events yet</div>';
     return;
   }
 
-  const acceptedMap = {};
-  for (const ap of state.acceptedPapers) {
-    if (!acceptedMap[ap.round_id]) {
-      acceptedMap[ap.round_id] = ap;
-    }
-  }
-
-  // Count papers and events per round
-  const rows = state.rounds
-    .map((r) => {
-      const ap = acceptedMap[r.id];
-      const paperTitle = ap?.papers?.title || "-";
-      const topicName = r.topics?.name || "-";
-      const paperCount = papersForRound(r.id).length;
-      const reviewCount = reviewsForRound(r.id).length;
-      const eventCount = mhEventsForRound(r.id).length;
-      const acceptCount = mhEventsForRound(r.id).filter((e) => e.accepted).length;
-      const rejectCount = eventCount - acceptCount;
-
-      const phaseColors = {
-        submission: "var(--accent)",
-        review: "var(--yellow)",
-        judgment: "var(--purple)",
-        completed: "var(--green)",
-      };
+  const rows = events
+    .map((e) => {
+      const paperTitle = e.paper_new?.title || e.paper_new_id?.slice(0, 8) || "?";
+      const currentTitle = e.paper_current?.title || (e.paper_current_id ? e.paper_current_id.slice(0, 8) : "-");
+      const resultStyle = e.accepted ? "color:var(--green)" : "color:var(--red)";
+      const resultText = e.accepted ? "ACCEPTED" : "REJECTED";
 
       return `
-      <tr class="${r.id === state.selectedRoundId ? 'history-selected' : ''}"
-          style="cursor:pointer" data-round-id="${r.id}">
-        <td><strong>${r.id}</strong></td>
-        <td>${esc(topicName)}</td>
-        <td><span style="color:${phaseColors[r.phase] || 'inherit'}">${r.phase}</span></td>
-        <td>${paperCount}</td>
-        <td>${reviewCount}</td>
-        <td><span style="color:var(--green)">${acceptCount}✓</span> / <span style="color:var(--red)">${rejectCount}✗</span></td>
+      <tr>
+        <td><strong>${e.chain_order + 1}</strong></td>
         <td>${esc(truncate(paperTitle, 40))}</td>
-        <td>${fmtDate(r.completed_at)}</td>
+        <td>${esc(truncate(currentTitle, 30))}</td>
+        <td>${e.alpha.toFixed(4)}</td>
+        <td>${e.u_draw.toFixed(4)}</td>
+        <td><span style="${resultStyle};font-weight:600">${resultText}</span></td>
+        <td>${fmtDate(e.created_at)}</td>
       </tr>`;
     })
     .join("");
@@ -467,19 +423,11 @@ function renderRoundHistory() {
     <table class="history-table">
       <thead>
         <tr>
-          <th>Round</th><th>Topic</th><th>Phase</th><th>Papers</th><th>Reviews</th><th>MH Results</th><th>w_current</th><th>Completed</th>
+          <th>#</th><th>w_new</th><th>w_current</th><th>&alpha;</th><th>u</th><th>Result</th><th>Date</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>`;
-
-  // Click row to select round
-  container.querySelectorAll("tr[data-round-id]").forEach((row) => {
-    row.addEventListener("click", () => {
-      state.selectedRoundId = Number(row.dataset.roundId);
-      render();
-    });
-  });
 }
 
 // ===== Paper Modal =====
@@ -488,7 +436,7 @@ async function openPaperModal(paperId) {
   if (!paper) return;
 
   $("#modal-title").textContent = paper.title;
-  $("#modal-meta").textContent = `by ${paper.agents?.name || "Unknown"} | Round ${paper.round_id} | Submitted ${fmtDate(paper.submitted_at)}`;
+  $("#modal-meta").textContent = `by ${paper.agents?.name || "Unknown"} | Submitted ${fmtDate(paper.submitted_at)}`;
   $("#modal-abstract").textContent = paper.abstract || "No abstract provided.";
   $("#modal-content").innerHTML = DOMPurify.sanitize(marked.parse(paper.content || "_No content._"));
 
@@ -503,16 +451,16 @@ async function openPaperModal(paperId) {
         <h3>MHNG Result</h3>
         <div class="modal-mh-stats">
           <span class="${statusClass}" style="font-weight:700;font-size:1rem">${statusText}</span>
-          <span>α = ${mhEvent.alpha.toFixed(4)}</span>
+          <span>${tex("\\alpha")} = ${mhEvent.alpha.toFixed(4)}</span>
           <span>u = ${mhEvent.u_draw.toFixed(4)}</span>
-          <span>log p(z|w_new) = ${fmt(mhEvent.score_new_agg)}</span>
-          <span>log p(z|w_cur) = ${fmt(mhEvent.score_current_agg)}</span>
+          <span>${tex("\\log p(z|w_{\\text{new}})")} = ${fmt(mhEvent.score_new_agg)}</span>
+          <span>${tex("\\log p(z|w_{\\text{cur}})")} = ${fmt(mhEvent.score_current_agg)}</span>
         </div>
         ${mhEvent.paper_current ? `<div style="font-size:0.75rem;color:var(--text-muted)">Compared against: ${esc(mhEvent.paper_current.title)}</div>` : ""}
       </div>`;
   }
 
-  // Render reviews for this paper
+  // Render reviews
   const paperReviews = state.allReviews.filter((r) => String(r.paper_id) === String(paperId));
   const reviewsEl = $("#modal-reviews");
 
@@ -527,7 +475,7 @@ async function openPaperModal(paperId) {
           <div class="review-item">
             <div class="review-header">
               <span>${esc(r.agents?.name || "Anonymous Reviewer")}</span>
-              <span class="review-score ${scoreClass}">p(z|w) = ${r.score.toFixed(2)}</span>
+              <span class="review-score ${scoreClass}">${tex("p(z|w)")} = ${r.score.toFixed(2)}</span>
             </div>
             <div class="review-feedback">${DOMPurify.sanitize(marked.parse(r.feedback || "No feedback."))}</div>
           </div>`;
@@ -546,6 +494,14 @@ function closeModal() {
 }
 
 // ===== Utilities =====
+function tex(expr) {
+  try {
+    return katex.renderToString(expr, { throwOnError: false });
+  } catch {
+    return expr;
+  }
+}
+
 function esc(str) {
   if (!str) return "";
   const div = document.createElement("div");

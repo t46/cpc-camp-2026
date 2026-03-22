@@ -96,77 +96,6 @@ header h1 {
   font-weight: 500;
 }
 
-/* ===== Phase Pipeline ===== */
-#phase-pipeline {
-  max-width: 1600px;
-  margin: 1.5rem auto;
-  padding: 0 2rem;
-}
-
-.pipeline {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-}
-
-.phase-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.phase-dot {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bg-card);
-  border: 2px solid var(--border);
-  transition: all 0.3s ease;
-}
-
-.phase-node span {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
-}
-
-.phase-node.active .phase-dot {
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 0 12px rgba(88, 166, 255, 0.4);
-}
-
-.phase-node.active span {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.phase-node.done .phase-dot {
-  background: var(--green);
-  border-color: var(--green);
-}
-
-.phase-node.done span {
-  color: var(--green);
-}
-
-.phase-connector {
-  width: 60px;
-  height: 2px;
-  background: var(--border);
-  margin: 0 0.25rem;
-  margin-bottom: 1.4rem;
-  transition: background 0.3s ease;
-}
-
-.phase-connector.done {
-  background: var(--green);
-}
-
 /* ===== Dashboard Grid ===== */
 #dashboard {
   max-width: 1600px;
@@ -293,7 +222,7 @@ header h1 {
   color: var(--red);
 }
 
-/* ===== MHNG Chain ===== */
+/* ===== MHNG Chain (Timeline) ===== */
 .chain-scroll {
   overflow-x: auto;
   overflow-y: auto;
@@ -301,66 +230,137 @@ header h1 {
   padding: 1rem !important;
 }
 
-.chain-container {
+.timeline {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 20px;
 }
 
-.chain-event {
-  flex: 0 0 200px;
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.tl-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  position: relative;
+  padding: 0.4rem 0;
+}
+
+.tl-dot {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: var(--bg-card);
   border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
-  transition: border-color 0.2s;
+  z-index: 1;
 }
 
-.chain-event.accepted {
+.tl-dot-accept {
   border-color: var(--green);
+  background: var(--green-dim);
 }
 
-.chain-event.rejected {
+.tl-dot-reject {
   border-color: var(--red);
+  background: var(--red-dim);
 }
 
-.chain-event .chain-order {
-  position: absolute;
-  top: -8px;
-  left: 10px;
-  background: var(--bg-surface);
-  padding: 0 0.4rem;
+.tl-dot-w {
+  border-color: var(--accent);
+  background: var(--accent);
+  width: 12px;
+  height: 12px;
+  margin: 8px;
+}
+
+.tl-step {
   font-size: 0.65rem;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tl-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* w_current nodes */
+.tl-w .tl-content {
+  padding: 0.2rem 0;
+}
+
+.tl-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
   font-weight: 600;
 }
 
-.chain-event .chain-title {
+.tl-title {
   font-size: 0.8rem;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  color: var(--accent);
+}
+
+.tl-clickable {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding-left: 0.25rem;
+  padding-right: 0.5rem;
+  margin-left: -0.25rem;
+  transition: background 0.2s;
+}
+
+.tl-clickable:hover {
+  background: var(--bg-hover);
+}
+
+/* Proposal nodes */
+.tl-proposal-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.chain-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.25rem;
-  font-size: 0.72rem;
+.tl-alpha-bar {
+  position: relative;
+  height: 14px;
+  background: var(--red-dim);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.3rem;
+  overflow: visible;
 }
 
-.chain-stats dt {
+.tl-stats {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
+  font-family: "SF Mono", "Fira Code", monospace;
 }
 
-.chain-stats dd {
-  text-align: right;
-  font-weight: 600;
-  font-family: "SF Mono", "Fira Code", monospace;
+.tl-stats .verdict-accept,
+.tl-stats .verdict-reject {
+  font-weight: 700;
 }
 
 .chain-verdict {
@@ -860,85 +860,7 @@ header h1 {
   color: var(--red);
 }
 
-/* ===== MHNG Chain Enhanced ===== */
-.chain-container {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.5rem 0;
-}
-
-.chain-start, .chain-end {
-  flex: 0 0 160px;
-  padding: 0.75rem;
-  border-radius: var(--radius);
-  text-align: center;
-}
-
-.chain-start {
-  background: var(--bg-card);
-  border: 2px dashed var(--border);
-}
-
-.chain-end {
-  background: var(--green-dim);
-  border: 2px solid var(--green);
-}
-
-.chain-start-label, .chain-end-label {
-  font-size: 0.6rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-  margin-bottom: 0.3rem;
-  font-weight: 600;
-}
-
-.chain-end-label {
-  color: var(--green);
-}
-
-.chain-start-title, .chain-end-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.chain-arrow {
-  flex-shrink: 0;
-  font-size: 1.2rem;
-  color: var(--text-muted);
-}
-
-.chain-event {
-  flex: 0 0 220px;
-  background: var(--bg-card);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-  position: relative;
-}
-
-.chain-order-badge {
-  position: absolute;
-  top: -8px;
-  left: 10px;
-  background: var(--bg-surface);
-  padding: 0 0.4rem;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.chain-alpha-bar {
-  position: relative;
-  height: 20px;
-  background: var(--red-dim);
-  border-radius: var(--radius-sm);
-  margin: 0.5rem 0;
-  overflow: visible;
-}
-
+/* ===== Alpha bar (shared) ===== */
 .alpha-fill {
   height: 100%;
   background: var(--green-dim);
@@ -950,29 +872,9 @@ header h1 {
   position: absolute;
   top: -2px;
   width: 2px;
-  height: 24px;
+  height: 18px;
   background: var(--accent);
   transform: translateX(-1px);
-}
-
-.alpha-label {
-  position: absolute;
-  bottom: -16px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 0.6rem;
-  color: var(--text-muted);
-  font-family: "SF Mono", "Fira Code", monospace;
-}
-
-.chain-scores {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.6rem;
-  color: var(--text-muted);
-  margin-top: 1.2rem;
-  font-family: "SF Mono", "Fira Code", monospace;
 }
 
 /* ===== Accepted Paper Enhancements ===== */
@@ -1001,6 +903,26 @@ header h1 {
   font-size: 0.65rem;
   color: var(--text-muted);
   margin-top: 0.15rem;
+}
+
+/* ===== Status Badge ===== */
+.status-badge {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.03em;
+}
+
+.status-pending {
+  background: var(--yellow-dim);
+  color: var(--yellow);
+}
+
+.status-reviewing {
+  background: rgba(88, 166, 255, 0.15);
+  color: var(--accent);
 }
 
 /* ===== History Selected Row ===== */
