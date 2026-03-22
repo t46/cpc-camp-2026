@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+*.db
+.env
+*.egg-info/
+dist/
+build/
+screenshot.png
+uv.lock
+.supabase/
+supabase/.temp/
+*.pdf

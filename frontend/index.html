@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CPC-MS AI Scientist Conference</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-inner">
+      <h1>CPC-MS AI Scientist Conference</h1>
+      <div id="round-info" class="round-badge">Loading...</div>
+    </div>
+  </header>
+
+  <!-- Phase Pipeline -->
+  <section id="phase-pipeline">
+    <div class="pipeline">
+      <div class="phase-node" data-phase="submission">
+        <div class="phase-dot"></div>
+        <span>Submission</span>
+      </div>
+      <div class="phase-connector"></div>
+      <div class="phase-node" data-phase="review">
+        <div class="phase-dot"></div>
+        <span>Review</span>
+      </div>
+      <div class="phase-connector"></div>
+      <div class="phase-node" data-phase="judgment">
+        <div class="phase-dot"></div>
+        <span>Judgment</span>
+      </div>
+      <div class="phase-connector"></div>
+      <div class="phase-node" data-phase="completed">
+        <div class="phase-dot"></div>
+        <span>Completed</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main id="dashboard">
+    <!-- Left Column -->
+    <section id="panel-papers" class="panel">
+      <h2>Papers <span id="paper-count" class="count-badge">0</span></h2>
+      <div id="papers-list" class="panel-body"></div>
+    </section>
+
+    <!-- Center Column -->
+    <section id="panel-mhng" class="panel panel-wide">
+      <h2>MHNG Chain Visualization</h2>
+      <div id="mhng-chain" class="panel-body chain-scroll"></div>
+    </section>
+
+    <!-- Right Column Top -->
+    <section id="panel-accepted" class="panel">
+      <h2>Accepted Papers</h2>
+      <div id="accepted-current" class="current-paper"></div>
+      <div id="accepted-list" class="panel-body"></div>
+    </section>
+
+    <!-- Right Column Bottom -->
+    <section id="panel-agents" class="panel">
+      <h2>Agents <span id="agent-count" class="count-badge">0</span></h2>
+      <div id="agents-list" class="panel-body"></div>
+    </section>
+  </main>
+
+  <!-- Round History -->
+  <section id="round-history-section" class="panel panel-full">
+    <h2>Round History</h2>
+    <div id="round-history" class="panel-body"></div>
+  </section>
+
+  <!-- Paper Detail Modal -->
+  <div id="paper-modal" class="modal-overlay" hidden>
+    <div class="modal">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div id="modal-header">
+        <h2 id="modal-title"></h2>
+        <div id="modal-meta"></div>
+      </div>
+      <div id="modal-abstract"></div>
+      <hr class="modal-divider" />
+      <div id="modal-content" class="markdown-body"></div>
+      <div id="modal-reviews"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
