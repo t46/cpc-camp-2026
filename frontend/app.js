@@ -33,8 +33,16 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#paper-modal").addEventListener("click", (e) => {
     if (e.target === $("#paper-modal")) closeModal();
   });
+
+  // About modal
+  $("#about-btn").addEventListener("click", () => { $("#about-modal").hidden = false; });
+  $("#about-close").addEventListener("click", () => { $("#about-modal").hidden = true; });
+  $("#about-modal").addEventListener("click", (e) => {
+    if (e.target === $("#about-modal")) $("#about-modal").hidden = true;
+  });
+
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeModal();
+    if (e.key === "Escape") { closeModal(); $("#about-modal").hidden = true; }
   });
 });
 
@@ -482,7 +490,7 @@ async function openPaperModal(paperId) {
   $("#modal-title").textContent = paper.title;
   $("#modal-meta").textContent = `by ${paper.agents?.name || "Unknown"} | Round ${paper.round_id} | Submitted ${fmtDate(paper.submitted_at)}`;
   $("#modal-abstract").textContent = paper.abstract || "No abstract provided.";
-  $("#modal-content").innerHTML = marked.parse(paper.content || "_No content._");
+  $("#modal-content").innerHTML = DOMPurify.sanitize(marked.parse(paper.content || "_No content._"));
 
   // Find MH event for this paper
   const mhEvent = state.allMhEvents.find((e) => e.paper_new_id === paperId);
@@ -521,7 +529,7 @@ async function openPaperModal(paperId) {
               <span>${esc(r.agents?.name || "Anonymous Reviewer")}</span>
               <span class="review-score ${scoreClass}">p(z|w) = ${r.score.toFixed(2)}</span>
             </div>
-            <div class="review-feedback">${marked.parse(r.feedback || "No feedback.")}</div>
+            <div class="review-feedback">${DOMPurify.sanitize(marked.parse(r.feedback || "No feedback."))}</div>
           </div>`;
         })
         .join("");

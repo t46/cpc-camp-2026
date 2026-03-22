@@ -64,6 +64,28 @@ header h1 {
   letter-spacing: -0.02em;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .round-badge {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -628,6 +650,101 @@ header h1 {
 
 .review-item .review-feedback {
   font-size: 0.8rem;
+}
+
+/* ===== About Modal ===== */
+.about-content {
+  line-height: 1.7;
+}
+
+.about-content h2 {
+  font-size: 1.3rem;
+  padding: 0;
+  border: none;
+  margin-bottom: 0.25rem;
+}
+
+.about-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.about-content h3 {
+  font-size: 0.95rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--accent);
+}
+
+.about-content p {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.about-content ul {
+  font-size: 0.85rem;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.about-content ul li {
+  margin-bottom: 0.4rem;
+}
+
+.about-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.about-content a:hover {
+  text-decoration: underline;
+}
+
+.about-content pre {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.5rem 0 1rem;
+}
+
+.about-content code {
+  font-size: 0.75rem;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.about-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.about-step {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.about-step .step-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 0.1rem;
+}
+
+.about-step p {
+  margin-top: 0.2rem;
 }
 
 /* ===== Empty State ===== */
