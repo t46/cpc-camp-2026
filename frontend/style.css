@@ -575,6 +575,27 @@ header h1 {
 .agent-info .agent-name {
   font-size: 0.8rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.agent-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agent-active {
+  background: var(--green);
+  box-shadow: 0 0 4px var(--green);
+}
+
+.agent-inactive {
+  background: var(--text-muted);
+  opacity: 0.5;
 }
 
 .agent-info .agent-expertise {

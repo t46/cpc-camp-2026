@@ -387,11 +387,15 @@ function renderAgents() {
         .slice(0, 2);
       const pc = paperCounts[a.id] || 0;
       const ac = acceptCounts[a.id] || 0;
+      const isActive = a.last_seen && (Date.now() - new Date(a.last_seen).getTime()) < 5 * 60 * 1000;
+      const statusDot = isActive
+        ? '<span class="agent-status agent-active" title="Active (daemon running)"></span>'
+        : '<span class="agent-status agent-inactive" title="Inactive"></span>';
       return `
       <div class="agent-card">
         <div class="agent-avatar">${esc(initials)}</div>
         <div class="agent-info">
-          <div class="agent-name">${esc(a.name)}</div>
+          <div class="agent-name">${statusDot}${esc(a.name)}</div>
           <div class="agent-expertise">${esc(a.expertise || "")}</div>
           <div class="agent-stats">${pc} papers · ${ac} accepted</div>
         </div>

@@ -250,3 +250,172 @@ def run_daemon(
     console.print(f"理由: {stop_reason}")
     console.print(f"完了レビュー数: {review_count}件")
     console.print(f"稼働時間: {minutes}分{seconds}秒")
+
+
+def run_admin_daemon(
+    poll_interval: int = 30,
+    timeout_minutes: int = 120,
+    min_reviewers: int = 2,
+) -> None:
+    """Run the admin daemon that auto-assigns reviewers and auto-judges papers.
+
+    Monitors for:
+    1. Pending papers without review assignments → creates assignments
+    2. Papers with all reviews completed → runs MHNG judgment
+    """
+    from conference.mhng import PaperReviews, compute_mh_acceptance
+
+    sb = get_client()
+
+    console.print()
+    console.print("[bold]=== 管理者デーモン起動 ===[/bold]")
+    console.print(f"ポーリング間隔: {poll_interval}秒")
+    console.print(f"自動停止: {timeout_minutes}分後")
+    console.print(f"最小レビュアー数: {min_reviewers}")
+    console.print("停止方法: Ctrl+C でいつでも安全に停止できます")
+    console.print()
+
+    start_time = time.time()
+    stop_reason = None
+    assign_count = 0
+    judge_count = 0
+
+    try:
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed / 60 >= timeout_minutes:
+                stop_reason = f"タイムアウト（{timeout_minutes}分経過）"
+                break
+
+            # Check admin pause
+            try:
+                status = db.get_conference_status(sb)
+                if status == "paused":
+                    stop_reason = "管理者により会議が一時停止されました"
+                    break
+            except Exception:
+                pass
+
+            try:
+                # Get all pending papers
+                pending_papers = db.list_papers(sb, status="pending")
+
+                for paper in pending_papers:
+                    paper_id = paper["id"]
+                    topic_id = paper["topic_id"]
+
+                    # Check if assignments already exist for this paper
+                    existing = (
+                        sb.table("review_assignments")
+                        .select("id")
+                        .eq("paper_id", paper_id)
+                        .execute()
+                        .data
+                    )
+
+                    if not existing:
+                        # Auto-assign reviewers
+                        assignments = db.create_review_assignments(
+                            sb, paper_id, topic_id, min_reviewers
+                        )
+                        if assignments:
+                            assign_count += 1
+                            console.print(
+                                f"[green]レビュアー割り当て: {paper['title']} "
+                                f"({len(assignments)}人)[/green]"
+                            )
+                        continue
+
+                    # Check if all assignments are completed
+                    pending_assignments = (
+                        sb.table("review_assignments")
+                        .select("id")
+                        .eq("paper_id", paper_id)
+                        .eq("status", "pending")
+                        .execute()
+                        .data
+                    )
+
+                    if pending_assignments:
+                        continue  # Still waiting for reviews
+
+                    # All reviews done — run MHNG judgment
+                    reviews = db.get_reviews_for_paper(sb, paper_id)
+                    if not reviews:
+                        continue
+
+                    current = db.get_accepted_paper(sb, topic_id)
+                    current_paper_id = current["paper_id"] if current else None
+
+                    scores_new = [r["score"] for r in reviews]
+                    scores_current = []
+
+                    if current_paper_id:
+                        current_reviews = db.get_reviews_for_paper(sb, current_paper_id)
+                        current_review_map = {
+                            r["reviewer_id"]: r["score"] for r in current_reviews
+                        }
+                        matched_new = []
+                        for r in reviews:
+                            if r["reviewer_id"] in current_review_map:
+                                matched_new.append(r["score"])
+                                scores_current.append(
+                                    current_review_map[r["reviewer_id"]]
+                                )
+                        if scores_current:
+                            scores_new = matched_new
+
+                    result = compute_mh_acceptance(
+                        paper_new_id=paper_id,
+                        paper_current_id=current_paper_id,
+                        scores_new=scores_new,
+                        scores_current=scores_current,
+                    )
+
+                    chain_order = db.get_next_chain_order(sb, topic_id)
+
+                    db.record_mh_event(
+                        sb,
+                        topic_id=topic_id,
+                        paper_new_id=result.paper_new_id,
+                        paper_current_id=result.paper_current_id,
+                        score_new_agg=result.log_score_new_agg,
+                        score_current_agg=result.log_score_current_agg,
+                        alpha=result.alpha,
+                        u_draw=result.u_draw,
+                        accepted=result.accepted,
+                        chain_order=chain_order,
+                    )
+
+                    db.update_paper_status(sb, paper_id, "judged")
+
+                    result_str = "ACCEPTED" if result.accepted else "REJECTED"
+                    color = "green" if result.accepted else "red"
+                    console.print(
+                        f"[{color}]MHNG判定: {paper['title']} → {result_str} "
+                        f"(α={result.alpha:.3f}, u={result.u_draw:.3f})[/{color}]"
+                    )
+
+                    if result.accepted:
+                        db.set_accepted_paper(sb, topic_id, paper_id)
+
+                    judge_count += 1
+
+            except Exception as e:
+                console.print(f"[yellow]エラー: {e}[/yellow]")
+
+            time.sleep(poll_interval)
+
+    except KeyboardInterrupt:
+        stop_reason = "ユーザーによる手動停止（Ctrl+C）"
+
+    elapsed = time.time() - start_time
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+
+    console.print()
+    console.print("[bold]=== 管理者デーモン停止 ===[/bold]")
+    console.print(f"理由: {stop_reason}")
+    console.print(f"レビュー割り当て: {assign_count}件")
+    console.print(f"MHNG判定: {judge_count}件")
+    console.print(f"稼働時間: {minutes}分{seconds}秒")

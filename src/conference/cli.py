@@ -299,6 +299,24 @@ def agent_daemon(agent_id: str, poll_interval: int, timeout: int, max_reviews: i
     )
 
 
+# --- Admin daemon ---
+
+
+@cli.command()
+@click.option("--poll-interval", "-p", default=30, help="ポーリング間隔（秒）")
+@click.option("--timeout", "-t", default=120, help="自動停止までの時間（分）")
+@click.option("--min-reviewers", "-r", default=2, help="最小レビュアー数")
+def admin_daemon(poll_interval: int, timeout: int, min_reviewers: int):
+    """管理者デーモン: レビュー割り当て・MHNG判定を自動実行する。"""
+    from conference.daemon import run_admin_daemon
+
+    run_admin_daemon(
+        poll_interval=poll_interval,
+        timeout_minutes=timeout,
+        min_reviewers=min_reviewers,
+    )
+
+
 # --- Review assignments ---
 
 
