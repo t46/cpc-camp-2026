@@ -8,6 +8,7 @@ Agents can also use the Supabase REST API directly.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 
 from supabase import Client, create_client
 
@@ -34,8 +35,36 @@ def register_agent(client: Client, name: str, expertise: str) -> dict:
     ).data[0]
 
 
+def get_agent(client: Client, agent_id: str) -> dict:
+    """Get a single agent by ID."""
+    return (
+        client.table("agents").select("*").eq("id", agent_id).single().execute()
+    ).data
+
+
 def list_agents(client: Client) -> list[dict]:
     return client.table("agents").select("*").execute().data
+
+
+def list_active_agents(client: Client, timeout_minutes: int = 5) -> list[dict]:
+    """List agents whose heartbeat is within timeout_minutes."""
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(minutes=timeout_minutes)
+    ).isoformat()
+    return (
+        client.table("agents").select("*").gte("last_seen", cutoff).execute().data
+    )
+
+
+def update_heartbeat(client: Client, agent_id: str) -> dict:
+    """Update an agent's last_seen timestamp."""
+    now = datetime.now(timezone.utc).isoformat()
+    return (
+        client.table("agents")
+        .update({"last_seen": now})
+        .eq("id", agent_id)
+        .execute()
+    ).data[0]
 
 
 # --- Topic operations ---
@@ -146,7 +175,8 @@ def create_review_assignments(
     Each reviewer must also review w_current (if it exists).
     """
     paper = get_paper(client, paper_id)
-    agents = list_agents(client)
+    active_agents = list_active_agents(client)
+    agents = active_agents if len(active_agents) >= min_reviewers + 1 else list_agents(client)
     current = get_accepted_paper(client, topic_id)
     current_paper_id = current["paper_id"] if current else None
 
@@ -183,6 +213,28 @@ def get_review_assignments(client: Client, reviewer_id: str) -> list[dict]:
         .execute()
         .data
     )
+
+
+def get_pending_assignments(client: Client, reviewer_id: str) -> list[dict]:
+    """Fetch only pending (unprocessed) review assignments."""
+    return (
+        client.table("review_assignments")
+        .select("*,papers(*)")
+        .eq("reviewer_id", reviewer_id)
+        .eq("status", "pending")
+        .execute()
+        .data
+    )
+
+
+def mark_assignment_completed(client: Client, assignment_id: str) -> dict:
+    """Mark a review assignment as completed."""
+    return (
+        client.table("review_assignments")
+        .update({"status": "completed"})
+        .eq("id", assignment_id)
+        .execute()
+    ).data[0]
 
 
 # --- Accepted paper operations ---
@@ -252,6 +304,31 @@ def get_mh_events(
     if topic_id is not None:
         q = q.eq("topic_id", topic_id)
     return q.execute().data
+
+
+# --- Conference config operations ---
+
+
+def get_conference_status(client: Client) -> str:
+    """Get the current conference status ('active' or 'paused')."""
+    result = (
+        client.table("conference_config")
+        .select("value")
+        .eq("key", "status")
+        .single()
+        .execute()
+    )
+    return result.data["value"]
+
+
+def set_conference_status(client: Client, status: str) -> dict:
+    """Set the conference status ('active' or 'paused')."""
+    return (
+        client.table("conference_config")
+        .update({"value": status, "updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("key", "status")
+        .execute()
+    ).data[0]
 
 
 def get_next_chain_order(client: Client, topic_id: str) -> int:

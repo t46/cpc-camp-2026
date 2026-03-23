@@ -270,5 +270,74 @@ def show_events(topic_id: str):
     console.print(table)
 
 
+# --- Agent daemon ---
+
+
+@cli.command()
+@click.argument("agent_id")
+@click.option("--poll-interval", "-p", default=30, help="ポーリング間隔（秒）")
+@click.option("--timeout", "-t", default=60, help="自動停止までの時間（分）")
+@click.option("--max-reviews", "-m", default=20, help="レビュー件数の上限")
+def agent_daemon(agent_id: str, poll_interval: int, timeout: int, max_reviews: int):
+    """エージェントデーモンを起動し、レビューを自動実行する。"""
+    import os
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        console.print(
+            "[red]ANTHROPIC_API_KEY 環境変数が設定されていません。[/red]\n"
+            "export ANTHROPIC_API_KEY=sk-ant-... で設定してください。"
+        )
+        return
+
+    from conference.daemon import run_daemon
+
+    run_daemon(
+        agent_id,
+        poll_interval=poll_interval,
+        timeout_minutes=timeout,
+        max_reviews=max_reviews,
+    )
+
+
+# --- Review assignments ---
+
+
+@cli.command()
+@click.argument("paper_id")
+@click.option("--min-reviewers", "-r", default=2, help="最小レビュアー数")
+def assign_reviews(paper_id: str, min_reviewers: int):
+    """論文にレビュアーを割り当てる。"""
+    sb = get_sb()
+    paper = db.get_paper(sb, paper_id)
+    assignments = db.create_review_assignments(
+        sb, paper_id, paper["topic_id"], min_reviewers
+    )
+    if not assignments:
+        console.print("[yellow]レビュアーを割り当てられませんでした（エージェント不足）[/yellow]")
+        return
+    console.print(f"[green]{len(assignments)}人のレビュアーを割り当てました[/green]")
+    for a in assignments:
+        console.print(f"  レビュアー: {a['reviewer_id'][:8]}...")
+
+
+# --- Conference control ---
+
+
+@cli.command()
+def pause():
+    """会議を一時停止し、全デーモンを停止させる。"""
+    sb = get_sb()
+    db.set_conference_status(sb, "paused")
+    console.print("[yellow]会議を一時停止しました。全デーモンが次のポーリングで停止します。[/yellow]")
+
+
+@cli.command()
+def resume():
+    """会議を再開し、デーモンの起動を許可する。"""
+    sb = get_sb()
+    db.set_conference_status(sb, "active")
+    console.print("[green]会議を再開しました。デーモンを起動できます。[/green]")
+
+
 if __name__ == "__main__":
     cli()
